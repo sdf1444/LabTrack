@@ -2,6 +2,7 @@ using LabTrack.Api.Contracts;
 using LabTrack.Api.Domain;
 using LabTrack.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace LabTrack.Api.Application;
 
@@ -51,7 +52,11 @@ public sealed class SampleService(LabTrackDbContext db, TimeProvider clock)
         sample.Events.Add(new SampleEvent { EventType = "Registered", Description = "Sample registered", OccurredAt = now });
         db.Samples.Add(sample);
         try { await db.SaveChangesAsync(ct); }
-        catch (DbUpdateException) { throw new ApiException(409, "That accession number is already in use."); }
+        catch (DbUpdateException exception) when (IsUniqueConstraintViolation(
+            exception, LabTrackDbContext.AccessionNumberUniqueIndexName))
+        {
+            throw new ApiException(409, "That accession number is already in use.");
+        }
         return ToDetail(sample);
     }
 
@@ -134,11 +139,20 @@ public sealed class SampleService(LabTrackDbContext db, TimeProvider clock)
             throw new ApiException(409, "This sample changed since you opened it. Refresh and try again.");
     }
 
+    private static bool IsUniqueConstraintViolation(DbUpdateException exception, string constraintName) =>
+        exception.GetBaseException() is PostgresException postgresException &&
+        postgresException.SqlState == PostgresErrorCodes.UniqueViolation &&
+        postgresException.ConstraintName == constraintName;
+
     private async Task SaveWithConcurrencyAsync(CancellationToken ct)
     {
         try { await db.SaveChangesAsync(ct); }
         catch (DbUpdateConcurrencyException) { throw new ApiException(409, "This sample changed concurrently. Refresh and try again."); }
-        catch (DbUpdateException) { throw new ApiException(409, "The update conflicts with an existing sample or result."); }
+        catch (DbUpdateException exception) when (IsUniqueConstraintViolation(
+            exception, LabTrackDbContext.ResultAnalyteUniqueIndexName))
+        {
+            throw new ApiException(409, "A result for this analyte has already been recorded.");
+        }
     }
 
     private static SampleDetailResponse ToDetail(LabSample sample) => new(

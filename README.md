@@ -35,7 +35,7 @@ The API is served by the same application as the browser UI. Check app and datab
 
 ## Run the tests
 
-Requires the .NET 10 SDK. From this directory:
+Requires the .NET 10 SDK and Docker Desktop or Docker Engine. API integration tests start an isolated PostgreSQL container. From this directory:
 
 ```bash
 dotnet test tests/LabTrack.Tests/LabTrack.Tests.csproj

@@ -5,6 +5,9 @@ namespace LabTrack.Api.Infrastructure;
 
 public sealed class LabTrackDbContext(DbContextOptions<LabTrackDbContext> options) : DbContext(options)
 {
+    public const string AccessionNumberUniqueIndexName = "IX_Samples_AccessionNumber";
+    public const string ResultAnalyteUniqueIndexName = "IX_Results_LabSampleId_AnalyteCode";
+
     public DbSet<LabSample> Samples => Set<LabSample>();
     public DbSet<TestResult> Results => Set<TestResult>();
     public DbSet<SampleEvent> Events => Set<SampleEvent>();
@@ -13,7 +16,8 @@ public sealed class LabTrackDbContext(DbContextOptions<LabTrackDbContext> option
     {
         var sample = modelBuilder.Entity<LabSample>();
         sample.HasKey(x => x.Id);
-        sample.HasIndex(x => x.AccessionNumber).IsUnique();
+        sample.HasIndex(x => x.AccessionNumber).IsUnique()
+            .HasDatabaseName(AccessionNumberUniqueIndexName);
         sample.Property(x => x.AccessionNumber).HasMaxLength(40).IsRequired();
         sample.Property(x => x.PatientReference).HasMaxLength(40).IsRequired();
         sample.Property(x => x.SpecimenType).HasMaxLength(60).IsRequired();
@@ -24,7 +28,8 @@ public sealed class LabTrackDbContext(DbContextOptions<LabTrackDbContext> option
 
         var result = modelBuilder.Entity<TestResult>();
         result.HasKey(x => x.Id);
-        result.HasIndex(x => new { x.LabSampleId, x.AnalyteCode }).IsUnique();
+        result.HasIndex(x => new { x.LabSampleId, x.AnalyteCode }).IsUnique()
+            .HasDatabaseName(ResultAnalyteUniqueIndexName);
         result.Property(x => x.AnalyteCode).HasMaxLength(30).IsRequired();
         result.Property(x => x.AnalyteName).HasMaxLength(80).IsRequired();
         result.Property(x => x.Unit).HasMaxLength(20).IsRequired();

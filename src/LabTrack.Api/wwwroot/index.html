@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f8f5">
+  <title>LabTrack — Sample workflow</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="LabTrack home"><span class="brand-mark">L</span><span>labtrack<span class="brand-dot">.</span></span></a>
+    <div class="topbar-meta"><span class="env-dot"></span> Demo laboratory <span class="topbar-divider"></span> Synthetic data</div>
+  </header>
+  <main class="shell">
+    <section class="page-heading">
+      <div><p class="eyebrow">LABORATORY OPERATIONS</p><h1>Sample workflow</h1><p class="subtitle">Register specimens, record results and track each step to completion.</p></div>
+      <button class="button button-primary" id="new-sample-button" type="button"><span aria-hidden="true">＋</span> Register sample</button>
+    </section>
+    <section class="metrics" aria-label="Sample totals">
+      <article class="metric-card"><span class="metric-label">All samples</span><strong id="count-all">—</strong><span class="metric-hint">Recent records</span></article>
+      <article class="metric-card"><span class="metric-label">Received</span><strong id="count-received">—</strong><span class="metric-hint">Awaiting processing</span></article>
+      <article class="metric-card"><span class="metric-label">In progress</span><strong id="count-progress">—</strong><span class="metric-hint">Being analysed</span></article>
+      <article class="metric-card"><span class="metric-label">Completed</span><strong id="count-completed">—</strong><span class="metric-hint">Results recorded</span></article>
+    </section>
+    <section class="workspace">
+      <div class="list-panel panel">
+        <div class="panel-heading"><div><h2>Sample register</h2><p>Search by accession or patient reference</p></div><span class="record-count" id="record-count">0 records</span></div>
+        <div class="filters"><label class="search-box"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Search samples…" autocomplete="off"></label><label class="sr-only" for="status-filter">Filter by status</label><select id="status-filter"><option value="">All statuses</option><option>Received</option><option>InProgress</option><option>Completed</option><option>Rejected</option></select></div>
+        <div class="table-wrap"><table><thead><tr><th>Accession</th><th>Specimen</th><th>Status</th><th>Results</th><th>Updated</th></tr></thead><tbody id="sample-rows"></tbody></table><div class="empty-state" id="empty-state" hidden><div class="empty-icon">⌕</div><strong>No samples found</strong><span>Try another search, or register a specimen.</span></div></div>
+      </div>
+      <aside class="detail-panel panel" id="detail-panel"><div class="detail-placeholder"><div class="empty-icon">◫</div><strong>Select a sample</strong><span>Its workflow, results and audit history will appear here.</span></div></aside>
+    </section>
+    <p class="demo-note"><span>ⓘ</span> Portfolio demo with synthetic records only. Not for real patient data or clinical use.</p>
+  </main>
+  <dialog id="register-dialog" class="dialog"><form id="register-form"><div class="dialog-head"><div><p class="eyebrow">NEW RECORD</p><h2>Register a sample</h2></div><button class="icon-button" type="button" data-close-dialog aria-label="Close">×</button></div><label>Accession number<input name="accessionNumber" required minlength="3" maxlength="40" placeholder="LAB-2026-0042"></label><label>Patient reference<input name="patientReference" required minlength="2" maxlength="40" placeholder="SYN-1042"></label><div class="form-row"><label>Specimen type<select name="specimenType" required><option value="">Choose type</option><option>Serum</option><option>Plasma</option><option>Whole blood</option><option>Urine</option><option>Other</option></select></label><label>Collected at<input name="collectedAt" type="datetime-local" required></label></div><p class="form-error" id="register-error" role="alert"></p><div class="dialog-actions"><button class="button button-quiet" type="button" data-close-dialog>Cancel</button><button class="button button-primary" type="submit">Register sample</button></div></form></dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>

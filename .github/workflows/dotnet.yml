@@ -1,0 +1,19 @@
+name: .NET CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore src/LabTrack.Api/LabTrack.Api.csproj
+      - run: dotnet build src/LabTrack.Api/LabTrack.Api.csproj --configuration Release --no-restore
+      - run: dotnet test tests/LabTrack.Tests/LabTrack.Tests.csproj --configuration Release

@@ -1,5 +1,9 @@
 **/bin
 **/obj
+**/node_modules
+**/.env
+ops/backups
+*.dump
 .git
 .vs
 .vscode

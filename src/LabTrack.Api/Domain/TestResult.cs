@@ -2,6 +2,10 @@ namespace LabTrack.Api.Domain;
 
 public sealed class TestResult
 {
+    public const int ValuePrecision = 12;
+    public const int ValueScale = 4;
+    public const decimal MaximumRepresentableValue = 99_999_999.9999m;
+
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid LabSampleId { get; set; }
     public string AnalyteCode { get; set; } = "";

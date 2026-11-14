@@ -7,7 +7,8 @@ public static class DatabaseInitializer
 {
     public static async Task InitializeAsync(LabTrackDbContext db, CancellationToken ct = default)
     {
-        await db.Database.EnsureCreatedAsync(ct);
+        await BaselineEnsureCreatedDatabaseAsync(db, ct);
+        await db.Database.MigrateAsync(ct);
         if (await db.Samples.AnyAsync(ct)) return;
 
         var now = DateTimeOffset.UtcNow;
@@ -21,13 +22,42 @@ public static class DatabaseInitializer
         await db.SaveChangesAsync(ct);
     }
 
+    private static async Task BaselineEnsureCreatedDatabaseAsync(LabTrackDbContext db, CancellationToken ct)
+    {
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF to_regclass('"Samples"') IS NOT NULL
+                   AND to_regclass('"Results"') IS NOT NULL
+                   AND to_regclass('"Events"') IS NOT NULL
+                   AND to_regclass('"__EFMigrationsHistory"') IS NULL
+                THEN
+                    CREATE TABLE "__EFMigrationsHistory" (
+                        "MigrationId" character varying(150) NOT NULL,
+                        "ProductVersion" character varying(32) NOT NULL,
+                        CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY ("MigrationId")
+                    );
+                    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+                    VALUES ('20261114024519_InitialSampleSchema', '10.0.0');
+                END IF;
+            END $$;
+            """,
+            ct);
+    }
+
     private static LabSample Sample(string accession, string patient, string specimen, SampleStatus status,
         DateTimeOffset collected, DateTimeOffset updated)
     {
         var sample = new LabSample
         {
-            AccessionNumber = accession, PatientReference = patient, SpecimenType = specimen,
-            CollectedAt = collected, Status = status, CreatedAt = collected, UpdatedAt = updated,
+            AccessionNumber = accession,
+            PatientReference = patient,
+            SpecimenType = specimen,
+            CollectedAt = collected,
+            Status = status,
+            CreatedAt = collected,
+            UpdatedAt = updated,
             Revision = status == SampleStatus.Received ? 1 : 2
         };
         sample.Events.Add(new SampleEvent { EventType = "Registered", Description = "Sample registered", OccurredAt = collected });
@@ -38,9 +68,15 @@ public static class DatabaseInitializer
 
     private static TestResult Result(Guid sampleId, string code, string name, decimal value,
         string unit, decimal low, decimal high, DateTimeOffset at) => new()
-    {
-        LabSampleId = sampleId, AnalyteCode = code, AnalyteName = name, Value = value,
-        Unit = unit, ReferenceLow = low, ReferenceHigh = high,
-        Flag = SampleWorkflow.ResultFlag(value, low, high), RecordedAt = at
-    };
+        {
+            LabSampleId = sampleId,
+            AnalyteCode = code,
+            AnalyteName = name,
+            Value = value,
+            Unit = unit,
+            ReferenceLow = low,
+            ReferenceHigh = high,
+            Flag = SampleWorkflow.ResultFlag(value, low, high),
+            RecordedAt = at
+        };
 }

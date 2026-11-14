@@ -19,10 +19,23 @@ public sealed class SampleWorkflowTests
     public static TheoryData<decimal, decimal?, decimal?, string> ReferenceFlags => new()
     {
         { 3.8m, 3.9m, 7.8m, "Low" },
+        { 3.9m, 3.9m, 7.8m, "Within range" },
         { 5.2m, 3.9m, 7.8m, "Within range" },
+        { 7.8m, 3.9m, 7.8m, "Within range" },
         { 8.1m, 3.9m, 7.8m, "High" },
         { 8.1m, null, 7.8m, "High" },
         { 2.2m, 3.9m, null, "Low" }
+    };
+
+    public static TheoryData<decimal, bool> StoredResultValues => new()
+    {
+        { 99_999_999.9999m, true },
+        { -99_999_999.9999m, true },
+        { 1.2345m, true },
+        { 1.23450m, true },
+        { 1.23456m, false },
+        { 100_000_000m, false },
+        { -100_000_000m, false }
     };
 
     [Theory]
@@ -39,5 +52,12 @@ public sealed class SampleWorkflowTests
         decimal value, decimal? low, decimal? high, string expected)
     {
         Assert.Equal(expected, SampleWorkflow.ResultFlag(value, low, high));
+    }
+
+    [Theory]
+    [MemberData(nameof(StoredResultValues))]
+    public void IsRepresentableResultValue_matches_database_numeric_precision(decimal value, bool expected)
+    {
+        Assert.Equal(expected, SampleWorkflow.IsRepresentableResultValue(value));
     }
 }

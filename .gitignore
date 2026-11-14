@@ -1,8 +1,14 @@
 **/bin/
 **/obj/
+**/node_modules/
+src/LabTrack.Api/wwwroot/
 .vs/
 .vscode/
 TestResults/
+src/LabTrack.Api/ClientApp/test-results/
+src/LabTrack.Api/ClientApp/playwright-report/
 *.user
 *.suo
 .env
+ops/backups/
+*.dump

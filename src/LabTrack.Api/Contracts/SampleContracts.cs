@@ -9,7 +9,9 @@ public sealed record CreateSampleRequest(
     [Required, StringLength(60, MinimumLength = 2)] string SpecimenType,
     DateTimeOffset CollectedAt);
 
-public sealed record ChangeStatusRequest(SampleStatus Status, int ExpectedRevision);
+public sealed record ChangeStatusRequest(
+    SampleStatus Status,
+    [Range(1, int.MaxValue)] int ExpectedRevision);
 
 public sealed record AddResultRequest(
     [Required, StringLength(30, MinimumLength = 2)] string AnalyteCode,
@@ -18,7 +20,7 @@ public sealed record AddResultRequest(
     [Required, StringLength(20, MinimumLength = 1)] string Unit,
     decimal? ReferenceLow,
     decimal? ReferenceHigh,
-    int ExpectedRevision);
+    [Range(1, int.MaxValue)] int ExpectedRevision);
 
 public sealed record ResultResponse(
     Guid Id, string AnalyteCode, string AnalyteName, decimal Value, string Unit,

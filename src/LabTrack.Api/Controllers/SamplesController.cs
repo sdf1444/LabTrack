@@ -1,13 +1,15 @@
 using LabTrack.Api.Application;
 using LabTrack.Api.Contracts;
 using LabTrack.Api.Domain;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LabTrack.Api.Controllers;
 
 [ApiController]
+[Authorize(Policy = LabTrackRoles.StaffPolicy)]
 [Route("api/samples")]
-public sealed class SamplesController(SampleService samples) : ControllerBase
+public sealed class SamplesController(ISampleService samples) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<SampleSummaryResponse>>> List(

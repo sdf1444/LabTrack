@@ -15,4 +15,9 @@ public static class SampleWorkflow
         if (referenceHigh is not null && value > referenceHigh) return "High";
         return "Within range";
     }
+
+    public static bool IsRepresentableResultValue(decimal value) =>
+        value >= -TestResult.MaximumRepresentableValue &&
+        value <= TestResult.MaximumRepresentableValue &&
+        decimal.Round(value, TestResult.ValueScale) == value;
 }

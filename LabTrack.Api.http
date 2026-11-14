@@ -1,0 +1,41 @@
+@baseUrl = http://localhost:8080
+@sampleId = 00000000-0000-0000-0000-000000000000
+@userId = 00000000-0000-0000-0000-000000000000
+
+### Sign in as the bootstrap administrator
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{$dotenv LABTRACK_ADMIN_EMAIL}}",
+  "password": "{{$dotenv LABTRACK_ADMIN_PASSWORD}}",
+  "rememberMe": false
+}
+
+### Get the signed-in account
+GET {{baseUrl}}/api/auth/me
+
+### List users (administrator only)
+GET {{baseUrl}}/api/auth/users
+
+### Get a user (administrator only)
+GET {{baseUrl}}/api/auth/users/{{userId}}
+
+### Create a technician (administrator only)
+POST {{baseUrl}}/api/auth/users
+Content-Type: application/json
+
+{
+  "email": "technician@example.test",
+  "password": "Replace-With-A-Unique-Password-42!",
+  "role": "LabTechnician"
+}
+
+### List samples (signed-in staff)
+GET {{baseUrl}}/api/samples
+
+### Get a sample
+GET {{baseUrl}}/api/samples/{{sampleId}}
+
+### Sign out
+POST {{baseUrl}}/api/auth/logout

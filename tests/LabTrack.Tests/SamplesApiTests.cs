@@ -9,8 +9,10 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Npgsql;
 using Testcontainers.PostgreSql;
 using Xunit;
 
@@ -36,6 +38,15 @@ public sealed class SamplesApiTests : IAsyncLifetime
     {
         await database.StartAsync();
         factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureAppConfiguration((_, configuration) =>
+                configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["ConnectionStrings:LabTrack"] = database.GetConnectionString(),
+                    ["LabTrack:BootstrapAdmin:Email"] = "admin@labtrack.test",
+                    ["LabTrack:BootstrapAdmin:Password"] = "LabTrack-Test-Admin-2026!",
+                    ["LabTrack:Monitoring:MetricsToken"] = "test-metrics-token"
+                }));
             builder.ConfigureTestServices(services =>
             {
                 services.RemoveAll<IDbContextOptionsConfiguration<LabTrackDbContext>>();
@@ -43,7 +54,8 @@ public sealed class SamplesApiTests : IAsyncLifetime
                 services.RemoveAll<DbContextOptions>();
                 services.AddDbContext<LabTrackDbContext>(options =>
                     options.UseNpgsql(database.GetConnectionString()));
-            }));
+            });
+        });
         client = factory.CreateClient();
     }
 
@@ -59,6 +71,55 @@ public sealed class SamplesApiTests : IAsyncLifetime
     {
         var health = await client.GetAsync("/api/health");
         Assert.Equal(HttpStatusCode.OK, health.StatusCode);
+
+        var unauthenticated = await client.GetAsync("/api/samples");
+        Assert.Equal(HttpStatusCode.Unauthorized, unauthenticated.StatusCode);
+        var invalidMetricsToken = await client.GetAsync("/metrics");
+        Assert.Equal(HttpStatusCode.Unauthorized, invalidMetricsToken.StatusCode);
+        using var metricsRequest = new HttpRequestMessage(HttpMethod.Get, "/metrics");
+        metricsRequest.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "test-metrics-token");
+        var metrics = await client.SendAsync(metricsRequest);
+        Assert.Equal(HttpStatusCode.OK, metrics.StatusCode);
+
+        var adminLogin = await client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email = "admin@labtrack.test",
+            password = "LabTrack-Test-Admin-2026!",
+            rememberMe = false
+        });
+        Assert.Equal(HttpStatusCode.OK, adminLogin.StatusCode);
+
+        var createTechnician = await client.PostAsJsonAsync("/api/auth/users", new
+        {
+            email = "technician@labtrack.test",
+            password = "LabTrack-Test-Tech-2026!",
+            role = "LabTechnician"
+        });
+        Assert.Equal(HttpStatusCode.Created, createTechnician.StatusCode);
+
+        var firstUserPage = await client.GetFromJsonAsync<UserResponse[]>(
+            "/api/auth/users?skip=0&take=1", JsonOptions);
+        var secondUserPage = await client.GetFromJsonAsync<UserResponse[]>(
+            "/api/auth/users?skip=1&take=1", JsonOptions);
+        Assert.NotNull(firstUserPage);
+        Assert.NotNull(secondUserPage);
+        Assert.Equal("admin@labtrack.test", Assert.Single(firstUserPage).Email);
+        Assert.Equal("technician@labtrack.test", Assert.Single(secondUserPage).Email);
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            (await client.GetAsync("/api/auth/users?skip=-1")).StatusCode);
+
+        using var technicianClient = factory.CreateClient();
+        var technicianLogin = await technicianClient.PostAsJsonAsync("/api/auth/login", new
+        {
+            email = "technician@labtrack.test",
+            password = "LabTrack-Test-Tech-2026!",
+            rememberMe = false
+        });
+        Assert.Equal(HttpStatusCode.OK, technicianLogin.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await technicianClient.GetAsync("/api/auth/users")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await technicianClient.GetAsync("/api/samples")).StatusCode);
 
         var initialSamples = await client.GetFromJsonAsync<SampleSummaryResponse[]>("/api/samples", JsonOptions);
         Assert.NotNull(initialSamples);
@@ -77,6 +138,10 @@ public sealed class SamplesApiTests : IAsyncLifetime
         var duplicateResponse = await client.PostAsJsonAsync("/api/samples", request, JsonOptions);
         Assert.Equal(HttpStatusCode.Conflict, duplicateResponse.StatusCode);
 
+        var missingRevision = await client.PatchAsJsonAsync(
+            $"/api/samples/{created.Id}/status", new { status = "InProgress" });
+        Assert.Equal(HttpStatusCode.BadRequest, missingRevision.StatusCode);
+
         var prematureCompletion = await client.PatchAsJsonAsync(
             $"/api/samples/{created.Id}/status",
             new { status = "Completed", expectedRevision = created.Revision });
@@ -92,6 +157,12 @@ public sealed class SamplesApiTests : IAsyncLifetime
 
         var resultRequest = new AddResultRequest(
             "crp", "C-reactive protein", 12m, "mg/L", 0m, 5m, 1);
+        var unrepresentableResult = await client.PostAsJsonAsync(
+            $"/api/samples/{created.Id}/results",
+            resultRequest with { Value = 1.23456m, ExpectedRevision = started.Revision },
+            JsonOptions);
+        Assert.Equal(HttpStatusCode.BadRequest, unrepresentableResult.StatusCode);
+
         var staleResult = await client.PostAsJsonAsync(
             $"/api/samples/{created.Id}/results", resultRequest, JsonOptions);
         Assert.Equal(HttpStatusCode.Conflict, staleResult.StatusCode);
@@ -122,6 +193,12 @@ public sealed class SamplesApiTests : IAsyncLifetime
             JsonOptions);
         Assert.Equal(HttpStatusCode.Conflict, duplicateResult.StatusCode);
 
+        var invalidSample = await client.PostAsJsonAsync(
+            "/api/samples",
+            new CreateSampleRequest("   ", "   ", "   ", DateTimeOffset.UtcNow),
+            JsonOptions);
+        Assert.Equal(HttpStatusCode.BadRequest, invalidSample.StatusCode);
+
         var persisted = await client.GetFromJsonAsync<SampleDetailResponse>(
             $"/api/samples/{created.Id}", JsonOptions);
         Assert.NotNull(persisted);
@@ -144,6 +221,32 @@ public sealed class SamplesApiTests : IAsyncLifetime
             new CreateSampleRequest("LAB-E2E-DBFAIL", "SYN-E2E-02", "Serum", DateTimeOffset.UtcNow),
             JsonOptions);
         Assert.Equal(HttpStatusCode.InternalServerError, databaseFailure.StatusCode);
+
+        await AssertAuditHistoryIsAppendOnlyAsync(persisted.Events[0].Id);
+
+        var logout = await client.PostAsync("/api/auth/logout", content: null);
+        Assert.Equal(HttpStatusCode.NoContent, logout.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/auth/me")).StatusCode);
+    }
+
+    private async Task AssertAuditHistoryIsAppendOnlyAsync(Guid eventId)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<LabTrackDbContext>();
+
+        var update = await Assert.ThrowsAsync<PostgresException>(() =>
+            db.Database.ExecuteSqlRawAsync(
+                """UPDATE "Events" SET "Description" = 'tampered' WHERE "Id" = {0}""", eventId));
+        Assert.Equal("55000", update.SqlState);
+
+        var delete = await Assert.ThrowsAsync<PostgresException>(() =>
+            db.Database.ExecuteSqlRawAsync(
+                """DELETE FROM "Events" WHERE "Id" = {0}""", eventId));
+        Assert.Equal("55000", delete.SqlState);
+
+        var truncate = await Assert.ThrowsAsync<PostgresException>(() =>
+            db.Database.ExecuteSqlRawAsync("""TRUNCATE TABLE "Events" """));
+        Assert.Equal("55000", truncate.SqlState);
     }
 
     private async Task InstallNonUniqueInsertFailureAsync()

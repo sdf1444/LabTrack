@@ -1,9 +1,12 @@
 using LabTrack.Api.Domain;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace LabTrack.Api.Infrastructure;
 
-public sealed class LabTrackDbContext(DbContextOptions<LabTrackDbContext> options) : DbContext(options)
+public sealed class LabTrackDbContext(DbContextOptions<LabTrackDbContext> options)
+    : IdentityDbContext<LabTrackUser, IdentityRole<Guid>, Guid>(options)
 {
     public const string AccessionNumberUniqueIndexName = "IX_Samples_AccessionNumber";
     public const string ResultAnalyteUniqueIndexName = "IX_Results_LabSampleId_AnalyteCode";
@@ -14,6 +17,8 @@ public sealed class LabTrackDbContext(DbContextOptions<LabTrackDbContext> option
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        base.OnModelCreating(modelBuilder);
+
         var sample = modelBuilder.Entity<LabSample>();
         sample.HasKey(x => x.Id);
         sample.HasIndex(x => x.AccessionNumber).IsUnique()
@@ -33,9 +38,9 @@ public sealed class LabTrackDbContext(DbContextOptions<LabTrackDbContext> option
         result.Property(x => x.AnalyteCode).HasMaxLength(30).IsRequired();
         result.Property(x => x.AnalyteName).HasMaxLength(80).IsRequired();
         result.Property(x => x.Unit).HasMaxLength(20).IsRequired();
-        result.Property(x => x.Value).HasPrecision(12, 4);
-        result.Property(x => x.ReferenceLow).HasPrecision(12, 4);
-        result.Property(x => x.ReferenceHigh).HasPrecision(12, 4);
+        result.Property(x => x.Value).HasPrecision(TestResult.ValuePrecision, TestResult.ValueScale);
+        result.Property(x => x.ReferenceLow).HasPrecision(TestResult.ValuePrecision, TestResult.ValueScale);
+        result.Property(x => x.ReferenceHigh).HasPrecision(TestResult.ValuePrecision, TestResult.ValueScale);
 
         var ev = modelBuilder.Entity<SampleEvent>();
         ev.HasKey(x => x.Id);
